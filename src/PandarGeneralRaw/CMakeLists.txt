@@ -3,9 +3,11 @@ project(PandarGeneral)
 
 
 find_package( Boost REQUIRED )
+find_package( Eigen3 REQUIRED )
 find_package(PCL REQUIRED COMPONENTS common)
+find_package(Threads REQUIRED)
 
-set (CMAKE_CXX_FLAGS "-fPIC --std=c++11")
+set (CMAKE_CXX_FLAGS "-fPIC --std=c++14")
 
 
 include_directories(
@@ -25,8 +27,11 @@ add_library( ${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME}
-		${Boost_LIBRARIES}
 		${PCL_IO_LIBRARIES}
+		${Boost_LIBRARIES}
+		boost_thread
+		Eigen3::Eigen
+		Threads::Threads
 )
 
 if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})

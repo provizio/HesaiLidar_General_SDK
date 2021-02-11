@@ -2,9 +2,11 @@ cmake_minimum_required(VERSION 2.8)
 project(PandarGeneralSDK)
 
 find_package( Boost REQUIRED )
+find_package( Eigen3 REQUIRED )
 find_package( PCL REQUIRED COMPONENTS common )
+find_package( Threads REQUIRED )
 
-set (CMAKE_CXX_FLAGS "-fPIC --std=c++11")
+set (CMAKE_CXX_FLAGS "-fPIC --std=c++14")
 
 add_subdirectory(src/PandarGeneralRaw)
 
@@ -24,9 +26,12 @@ add_library( ${PROJECT_NAME} SHARED
 
 target_link_libraries(${PROJECT_NAME} 
     PandarGeneral
-    ${Boost_LIBRARIES}
     ${PCL_IO_LIBRARIES}
+    ${Boost_LIBRARIES}
+    boost_thread
+    Eigen3::Eigen
     pcap
+    Threads::Threads
 )
 
 if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
@@ -37,8 +42,11 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
 
     target_link_libraries(PandarGeneralTest
         ${PROJECT_NAME}
-        ${Boost_LIBRARIES}
         ${PCL_IO_LIBRARIES}
+        ${Boost_LIBRARIES}
+        boost_thread
+        Eigen3::Eigen
+        Threads::Threads
     )
 endif(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
 
