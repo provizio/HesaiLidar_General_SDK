@@ -101,6 +101,9 @@ int PandarGeneralSDK::Start() {
   enable_get_calibration_thr_ = true;
   get_calibration_thr_ = new boost::thread(
       boost::bind(&PandarGeneralSDK::GetCalibrationFromDevice, this));
+
+  // iurii@proviz.io: returned value is always ignored, but must be returned
+  return 0;
 }
 
 void PandarGeneralSDK::Stop() {
@@ -150,12 +153,20 @@ void PandarGeneralSDK::GetCalibrationFromDevice() {
 
 int PandarGeneralSDK::getMajorVersion() {
   if (pandarGeneral_) {
-    pandarGeneral_->getMajorVersion();
+    // iurii@proviz.io: Must return value
+    return pandarGeneral_->getMajorVersion();
   }
+
+  // iurii@proviz.io: Must return value
+  return 0;
 }
 
 int PandarGeneralSDK::getMinorVersion() {
   if (pandarGeneral_) {
-    pandarGeneral_->getMinorVersion();
+    // iurii@proviz.io: Must return value
+    return pandarGeneral_->getMinorVersion();
   }
+
+  // iurii@proviz.io: Must return value
+  return 0;
 }

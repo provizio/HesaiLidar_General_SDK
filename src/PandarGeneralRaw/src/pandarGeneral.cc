@@ -87,12 +87,20 @@ void PandarGeneral::Stop() { internal_->Stop(); }
 
 int PandarGeneral::getMajorVersion() {
   if (internal_) {
-    internal_->getMajorVersion();
+    // iurii@proviz.io: Must return value
+    return internal_->getMajorVersion();
   }
+
+  // iurii@proviz.io: Must return value
+  return 0;
 }
 
 int PandarGeneral::getMinorVersion() {
   if (internal_) {
-    internal_->getMinorVersion();
+    // iurii@proviz.io: Must return value
+    return internal_->getMinorVersion();
   }
+
+  // iurii@proviz.io: Must return value
+  return 0;
 }

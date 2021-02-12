@@ -63,7 +63,10 @@ static void print_mem(char* mem, int len) {}
 
 static int tcpCommandHeaderParser(unsigned char* buffer, int len,
                                   TcpCommandHeader* header) {
+  // iurii@proviz.io: Only print in Debug builds
+#ifdef DEBUG
   printf("tcpCommandHeaderParser\n");
+#endif
   int index = 0;
   header->cmd = buffer[index++];
   header->ret_code = buffer[index++];
@@ -74,7 +77,10 @@ static int tcpCommandHeaderParser(unsigned char* buffer, int len,
 }
 
 static int tcpCommandReadCommand(int connfd, TC_Command* cmd) {
+  // iurii@proviz.io: Only print in Debug builds
+#ifdef DEBUG
   printf("tcpCommandReadCommand\n");
+#endif
   int ret = 0;
   if (!cmd) {
     return -1;
@@ -120,7 +126,10 @@ static int tcpCommandReadCommand(int connfd, TC_Command* cmd) {
 }
 
 static int TcpCommand_buildHeader(char* buffer, TC_Command* cmd) {
+  // iurii@proviz.io: Only print in Debug builds
+#ifdef DEBUG
   printf("TcpCommand_buildHeader\n");
+#endif
   if (!buffer) {
     return -1;
   }
@@ -139,7 +148,10 @@ static int TcpCommand_buildHeader(char* buffer, TC_Command* cmd) {
 
 static PTC_ErrCode tcpCommandClient_SendCmd(TcpCommandClient* client,
                                             TC_Command* cmd) {
+  // iurii@proviz.io: Only print in Debug builds
+#ifdef DEBUG
   printf("tcpCommandClient_SendCmd\n");
+#endif
   if (!client && !cmd) {
     printf("Bad Parameter\n");
     return PTC_ERROR_BAD_PARAMETER;
@@ -202,7 +214,10 @@ static PTC_ErrCode tcpCommandClient_SendCmd(TcpCommandClient* client,
 }
 
 void* TcpCommandClientNew(const char* ip, const unsigned short port) {
+  // iurii@proviz.io: Only print in Debug builds
+#ifdef DEBUG
   printf("TcpCommandClientNew\n");
+#endif
   if (!ip) {
     printf("Bad Parameter\n");
     return NULL;
@@ -221,13 +236,17 @@ void* TcpCommandClientNew(const char* ip, const unsigned short port) {
 
   pthread_mutex_init(&client->lock, NULL);
 
+  // iurii@proviz.io: Only print in Debug builds
+#ifdef DEBUG
   printf("TCP Command Client Init Success!!!\n");
+#endif
   return (void*)client;
 }
 
 PTC_ErrCode TcpCommandSetCalibration(const void* handle, const char* buffer,
                                      unsigned int len) {
-  printf("buffer is: %s,len is: %d\n",buffer,len);
+  // iurii@proviz.io: Buffer is char**, not char*; len is a pointer, not int. Just don't printf
+  // Commented-out: printf("buffer is: %s,len is: %d\n",buffer,len);
   if (!handle || !buffer || len <= 0) {
     printf("Bad Parameter!!!\n");
     return PTC_ERROR_BAD_PARAMETER;
@@ -257,7 +276,8 @@ PTC_ErrCode TcpCommandSetCalibration(const void* handle, const char* buffer,
 
 PTC_ErrCode TcpCommandGetCalibration(const void* handle, char** buffer,
                                      unsigned int* len) {
-  printf("buffer is: %s,len is: %d\n",buffer,len);
+  // iurii@proviz.io: Buffer is char**, not char*; len is a pointer, not int. Just don't printf
+  // Commented-out: printf("buffer is: %s,len is: %d\n",buffer,len);
   if (!handle || !buffer || !len) {
     printf("Bad Parameter!!!\n");
     return PTC_ERROR_BAD_PARAMETER;
@@ -288,7 +308,8 @@ PTC_ErrCode TcpCommandGetCalibration(const void* handle, char** buffer,
 }
 PTC_ErrCode TcpCommandGetLidarCalibration(const void* handle, char** buffer,
                                           unsigned int* len) {
-  printf("buffer is: %s,len is: %d\n",buffer,len);
+  // iurii@proviz.io: Buffer is char**, not char*; len is a pointer, not int. Just don't printf
+  // Commented-out: printf("buffer is: %s,len is: %d\n",buffer,len);
   if (!handle || !buffer || !len) {
     printf("Bad Parameter!!!\n");
     return PTC_ERROR_BAD_PARAMETER;
@@ -319,7 +340,10 @@ PTC_ErrCode TcpCommandGetLidarCalibration(const void* handle, char** buffer,
 }
 
 PTC_ErrCode TcpCommandResetCalibration(const void* handle) {
+  // iurii@proviz.io: Only print in Debug builds
+#ifdef DEBUG
   printf("TcpCommandResetCalibration\n");
+#endif
   if (!handle) {
     printf("Bad Parameter!!!\n");
     return PTC_ERROR_BAD_PARAMETER;

@@ -27,17 +27,20 @@ public:
         m_cFile = file;
         m_cFunc = func;
         struct tm *ptm;
-        struct timeb stTimeb;
-        ftime(&stTimeb);
-        ptm = localtime(&stTimeb.time);
-        printf("[T] %02d:%02d:%02d.%03d pid:%d tid:%10d ->[File:%s Function:%s ]\n", ptm->tm_hour, ptm->tm_min, ptm->tm_sec, stTimeb.millitm, getpid(), std::hash<std::thread::id>()(std::this_thread::get_id()), m_cFile, m_cFunc);
+        // iurii@proviz.io: ftime is obsolete
+        const time_t now = time(nullptr);
+        ptm = localtime(&now);
+        // iurii@proviz.io: %d requires int, not std::size_t as returned by std::hash
+        printf("[T] %02d:%02d:%02d.%03d pid:%d tid:%10d ->[File:%s Function:%s ]\n", ptm->tm_hour, ptm->tm_min, ptm->tm_sec, 0, getpid(), static_cast<int>(std::hash<std::thread::id>()(std::this_thread::get_id())), m_cFile, m_cFunc);
     }
     ~TranceFunc(){
         struct tm *ptm;
         struct timeb stTimeb;
-        ftime(&stTimeb);
-        ptm = localtime(&stTimeb.time);
-        printf("[T] %02d:%02d:%02d.%03d pid:%d tid:%10d <-[File:%s Function:%s ]\n", ptm->tm_hour, ptm->tm_min, ptm->tm_sec, stTimeb.millitm, getpid(), std::hash<std::thread::id>()(std::this_thread::get_id()), m_cFile, m_cFunc);
+        // iurii@proviz.io: ftime is obsolete
+        const time_t now = time(nullptr);
+        ptm = localtime(&now);
+        // iurii@proviz.io: %d requires int, not std::size_t as returned by std::hash
+        printf("[T] %02d:%02d:%02d.%03d pid:%d tid:%10d <-[File:%s Function:%s ]\n", ptm->tm_hour, ptm->tm_min, ptm->tm_sec, 0, getpid(), static_cast<int>(std::hash<std::thread::id>()(std::this_thread::get_id())), m_cFile, m_cFunc);
     }
     const char* m_cFile;
     const char* m_cFunc;

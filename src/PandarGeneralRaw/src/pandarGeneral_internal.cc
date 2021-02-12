@@ -591,6 +591,9 @@ int PandarGeneral_Internal::Start() {
     m_threadLidarAlgorithmProcess = new boost::thread(boost::bind(&PandarGeneral_Internal::ProcessAlgorithmPacket, this));
     m_threadLidarAlgorithmRecv = new boost::thread(boost::bind(&PandarGeneral_Internal::recvAlgorithmPacket, this));
   }
+
+  // iurii@proviz.io: returned value is always ignored, but must be returned
+  return 0;
 }
 
 void PandarGeneral_Internal::Stop() {
