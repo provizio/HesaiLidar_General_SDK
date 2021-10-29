@@ -664,6 +664,9 @@ void PandarGeneral_Internal::ResetStartAngle(uint16_t start_angle) {
 }
 
 void PandarGeneral_Internal::Start() {
+  // iurii@proviz.io: Required in the newer boost
+  using namespace boost::placeholders;
+
   // LOG_FUNC();
   Stop();
   enable_lidar_recv_thr_ = true;
@@ -684,9 +687,6 @@ void PandarGeneral_Internal::Start() {
     m_threadLidarAlgorithmProcess = new boost::thread(boost::bind(&PandarGeneral_Internal::ProcessAlgorithmPacket, this));
     m_threadLidarAlgorithmRecv = new boost::thread(boost::bind(&PandarGeneral_Internal::recvAlgorithmPacket, this));
   }
-
-  // iurii@proviz.io: returned value is always ignored, but must be returned
-  return 0;
 }
 
 void PandarGeneral_Internal::Stop() {

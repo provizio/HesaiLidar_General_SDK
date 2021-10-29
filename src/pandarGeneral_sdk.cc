@@ -105,9 +105,6 @@ void PandarGeneralSDK::Start() {
   enable_get_calibration_thr_ = true;
   get_calibration_thr_ = new boost::thread(
       boost::bind(&PandarGeneralSDK::GetCalibrationFromDevice, this));
-
-  // iurii@proviz.io: returned value is always ignored, but must be returned
-  return 0;
 }
 
 void PandarGeneralSDK::Stop() {

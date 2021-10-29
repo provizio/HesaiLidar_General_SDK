@@ -111,6 +111,9 @@ bool PandarGeneral::GetCorrectionFileFlag(){
   if (internal_) {
     return internal_->GetCorrectionFileFlag();
   }
+
+  // iurii@proviz.io: Must return value
+  return false;
 }
 
 void PandarGeneral::SetCorrectionFileFlag(bool flag){

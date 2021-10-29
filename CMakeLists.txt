@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 project(PandarGeneralSDK)
 
 find_package( Boost REQUIRED  COMPONENTS thread)
+find_package( Eigen3 REQUIRED )
 find_package( PCL REQUIRED COMPONENTS common )
 find_package( Threads REQUIRED )
 
@@ -29,6 +30,7 @@ target_link_libraries(${PROJECT_NAME}
     ${PCL_IO_LIBRARIES}
     Boost::thread
     pcap
+    Eigen3::Eigen
     Threads::Threads
 )
 
@@ -41,6 +43,7 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(PandarGeneralTest
         ${PROJECT_NAME}
         ${PCL_IO_LIBRARIES}
+        Eigen3::Eigen
         Boost::thread
     )
 endif(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
