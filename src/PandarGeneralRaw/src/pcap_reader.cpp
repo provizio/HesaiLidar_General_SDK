@@ -40,6 +40,7 @@ void PcapReader::initTimeIndexMap() {
   m_timeIndexMap.insert(std::pair<string,std::pair<int,int>>("Pandar20B", std::pair<int,int>(1258,1264)));
   m_timeIndexMap.insert(std::pair<string,std::pair<int,int>>("PandarXT-32", std::pair<int,int>(1071,1065)));
   m_timeIndexMap.insert(std::pair<string,std::pair<int,int>>("PandarXT-16", std::pair<int,int>(559,553)));
+  m_timeIndexMap.insert(std::pair<string,std::pair<int,int>>("PandarXTM", std::pair<int,int>(811,805)));
 }
 
 void PcapReader::start(boost::function<void(const uint8_t*, const int, double timestamp)> callback) {
@@ -56,6 +57,7 @@ void PcapReader::stop() {
   loop = false;
 
   if (parse_thr_) {
+    parse_thr_->interrupt();
     parse_thr_->join();
     delete parse_thr_;
     parse_thr_ = NULL;
@@ -69,7 +71,7 @@ void PcapReader::parsePcap() {
   struct bpf_program filter;
   pcap_pkthdr *pktHeader;
   const unsigned char *packetBuf;
-  struct tm t;
+  struct tm t = {0};
   static int gap = 100;
   int64_t last_pkt_ts = 0;
   int count;
@@ -99,6 +101,7 @@ void PcapReader::parsePcap() {
     return;
   }
   while (pcap_next_ex(pcapFile, &pktHeader, &packetBuf) >= 0 && loop) {
+    boost::this_thread::interruption_point();
     const uint8_t *packet = packetBuf + PKT_HEADER_SIZE;
     int pktSize = pktHeader->len - PKT_HEADER_SIZE;
     double time = getNowTimeSec();

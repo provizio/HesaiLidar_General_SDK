@@ -134,6 +134,20 @@ HS_LIDAR_L64_7_BLOCK_PACKET_BODY_SIZE + HS_LIDAR_L64_PACKET_TAIL_WITHOUT_UDPSEQ_
 #define HesaiLidarSDK_DEFAULT_GPS_RECV_PORT 10110
 
 #define MAX_LASER_NUM (256)
+#define MAX_POINT_CLOUD_NUM (1000000)
+#define MAX_POINT_CLOUD_NUM_PER_CHANNEL (10000)
+#define MAX_AZIMUTH_DEGREE_NUM (36000)
+#define HS_LIDAR_XT_COORDINATE_CORRECTION_H (0.0315)
+#define HS_LIDAR_XT_COORDINATE_CORRECTION_B (0.013)
+#define HS_LIDAR_XTM_COORDINATE_CORRECTION_H (0.0305)
+#define HS_LIDAR_XTM_COORDINATE_CORRECTION_B (0.013)
+#define HS_LIDAR_QT_COORDINATE_CORRECTION_ODOG (0.0298)
+#define HS_LIDAR_QT_COORDINATE_CORRECTION_ODOT (0.0072)
+#define HS_LIDAR_QT_COORDINATE_CORRECTION_F (0.0295)
+#define HS_LIDAR_QT_COORDINATE_CORRECTION_I0 (0.0006)
+#define HS_LIDAR_QT_COORDINATE_CORRECTION_S0 (0.00017)
+#define HS_LIDAR_QT_COORDINATE_CORRECTION_D0 (20)
+#define COORDINATE_CORRECTION_CHECK (false)
 
 struct Pandar40PUnit_s {
   uint8_t intensity;
@@ -153,6 +167,7 @@ struct Pandar40PPacket_s {
   struct tm t;
   uint32_t usec;
   int echo;
+  double timestamp_point;
 };
 typedef struct Pandar40PPacket_s Pandar40PPacket;
 
@@ -192,6 +207,7 @@ typedef struct HS_LIDAR_L64_Packet_s{
     unsigned int timestamp; // ms
     unsigned int echo;
     unsigned char addtime[6];
+    double timestamp_point;
 } HS_LIDAR_L64_Packet;
 /***************Pandar64****************************/
 
@@ -231,6 +247,7 @@ typedef struct HS_LIDAR_L20_Packet_s{
     unsigned int timestamp; // ms
     unsigned int echo;
     unsigned char addtime[6];
+    double timestamp_point;
 } HS_LIDAR_L20_Packet;
 /************Pandar20A/B*******************************/
 
@@ -318,6 +335,52 @@ typedef struct {
     std::vector<HS_Object3D_Object> data;  //!< Object data array
 } HS_Object3D_Object_List;
 
+typedef std::array<PandarPacket, 36000> PktArray;
+
+typedef struct PacketsBuffer_s {
+  PktArray m_buffers{};
+  PktArray::iterator m_iterPush;
+  PktArray::iterator m_iterCalc;
+  bool m_startFlag;
+  inline PacketsBuffer_s() {
+    m_iterPush = m_buffers.begin();
+    m_iterCalc = m_buffers.begin();
+    m_startFlag = false;
+  }
+  inline int push_back(PandarPacket pkt) {
+    if (!m_startFlag) {
+      *m_iterPush = pkt;
+      m_startFlag = true;
+      return 1;
+    } 
+    m_iterPush++;
+
+    if (m_iterPush == m_iterCalc) {
+      printf("buffer don't have space!,%d\n", m_iterPush - m_buffers.begin());
+      return 0;
+    }
+
+    if (m_buffers.end() == m_iterPush) {
+      m_iterPush = m_buffers.begin();
+      *m_iterPush = pkt;
+    }
+    *m_iterPush = pkt;
+    return 1;
+    
+  }
+  inline bool hasEnoughPackets() {
+    return ((m_iterPush - m_iterCalc > 0 ) ||
+            ((m_iterPush - m_iterCalc + 36000 > 0 ) && (m_buffers.end() - m_iterCalc < 1000) && (m_iterPush - m_buffers.begin() < 1000)));
+  }
+  inline PktArray::iterator getIterCalc() { return m_iterCalc;}
+  inline void moveIterCalc() {
+    m_iterCalc++;
+    if (m_buffers.end() == m_iterCalc) {
+      m_iterCalc = m_buffers.begin();
+    }
+  }
+} PacketsBuffer;
+
 
 class PandarGeneral_Internal {
  public:
@@ -336,7 +399,8 @@ class PandarGeneral_Internal {
           pcl_callback,
           boost::function<void(HS_Object3D_Object_List*)> algorithm_callback,
           boost::function<void(double)> gps_callback, 
-      uint16_t start_angle, int tz, int pcl_type, std::string lidar_type, std::string frame_id, std::string timestampType);
+          uint16_t start_angle, int tz, int pcl_type, std::string lidar_type, std::string frame_id, std::string timestampType,
+          std::string lidar_correction_file, std::string multicast_ip, bool coordinate_correction_flag);
 
   /**
    * @brief Constructor
@@ -351,7 +415,7 @@ class PandarGeneral_Internal {
       std::string pcap_path, \
       boost::function<void(boost::shared_ptr<PPointCloud>, double)> \
       pcl_callback, uint16_t start_angle, int tz, int pcl_type, \
-      std::string lidar_type, std::string frame_id, std::string timestampType);// the default timestamp type is LiDAR time
+      std::string lidar_type, std::string frame_id, std::string timestampType, bool coordinate_correction_flag);// the default timestamp type is LiDAR time
   ~PandarGeneral_Internal();
 
   /**
@@ -366,8 +430,10 @@ class PandarGeneral_Internal {
    */
   void ResetStartAngle(uint16_t start_angle);
 
-  int Start();
+  void Start();
   void Stop();
+  bool GetCorrectionFileFlag();
+  void SetCorrectionFileFlag(bool flag);
 
     /*
     @Description：Udp byte stream analysis function
@@ -452,6 +518,7 @@ class PandarGeneral_Internal {
   void FillPacket(const uint8_t *buf, const int len, double timestamp);
 
   void EmitBackMessege(char chLaserNumber, boost::shared_ptr<PPointCloud> cld);
+  void SetEnvironmentVariableTZ();
   pthread_mutex_t lidar_lock_;
   sem_t lidar_sem_;
   boost::thread *lidar_recv_thr_;
@@ -488,6 +555,7 @@ class PandarGeneral_Internal {
   float cos_lookup_table_[ROTATION_MAX_UNITS];
 
   uint16_t last_azimuth_;
+  double last_timestamp_;
 
   float elev_angle_map_[LASER_COUNT];
   float horizatal_azimuth_offset_map_[LASER_COUNT];
@@ -523,6 +591,7 @@ class PandarGeneral_Internal {
 
   float blockXTOffsetSingle_[HS_LIDAR_XT_BLOCK_NUMBER];
   float blockXTOffsetDual_[HS_LIDAR_XT_BLOCK_NUMBER];
+  float blockXTOffsetTriple_[HS_LIDAR_XT_BLOCK_NUMBER];
   float laserXTOffset_[HS_LIDAR_XT_UNIT_NUM];
 
   int tz_second_;
@@ -531,6 +600,20 @@ class PandarGeneral_Internal {
   PcapReader *pcap_reader_;
   bool connect_lidar_;
   std::string m_sLidarType;
+  std::vector<float> m_sin_azimuth_map_;
+  std::vector<float> m_cos_azimuth_map_;
+  std::vector<float> m_sin_elevation_map_;
+  std::vector<float> m_cos_elevation_map_;
+  std::vector<float> m_sin_azimuth_map_h;
+  std::vector<float> m_cos_azimuth_map_h;
+  std::vector<float> m_sin_azimuth_map_b;
+  std::vector<float> m_cos_azimuth_map_b;
+  bool got_lidar_correction_flag;
+  std::string correction_file_path_;
+  PacketsBuffer m_PacketsBuffer;
+  bool m_bCoordinateCorrectionFlag;
+  uint16_t m_iAzimuthRange;
+
 };
 
 #endif  // SRC_PANDARGENERAL_INTERNAL_H_
