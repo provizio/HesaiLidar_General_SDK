@@ -349,10 +349,16 @@ private:
   bool m_full;
 public:
   inline PacketsBuffer_s() {
+    reset();
+  }
+  
+  inline void reset() {
+    std::lock_guard<std::mutex> lock{mutex};
     m_iterPush = m_buffers.begin();
     m_iterPop = m_buffers.begin();
     m_full = false;
   }
+
   inline int push_back(const PandarPacket& pkt) {
     std::lock_guard<std::mutex> lock{mutex};
 
@@ -559,8 +565,6 @@ class PandarGeneral_Internal {
   std::list<PandarPacket> m_listAlgorithmPacket;
   boost::shared_ptr<Input> m_spAlgorithmPktInput;
   boost::function<void(HS_Object3D_Object_List*)> m_fAlgorithmCallback;
-
-  std::list<struct PandarPacket_s> lidar_packets_;
 
   boost::shared_ptr<Input> input_;
   boost::function<void(boost::shared_ptr<PPointCloud> cld, double timestamp)>

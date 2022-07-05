@@ -718,12 +718,14 @@ void PandarGeneral_Internal::Stop() {
     pcap_reader_->stop();
   }
 
-  if(m_bEnableLidarAlgorithmRecvThread) {
+  m_PacketsBuffer.reset();
+
+  if (m_bEnableLidarAlgorithmRecvThread) {
     m_threadLidarAlgorithmRecv->interrupt();
         m_threadLidarAlgorithmRecv->join();
         delete m_threadLidarAlgorithmRecv;
         m_threadLidarAlgorithmRecv = NULL;
-    }
+  }
 
     if(m_bEnableLidarAlgorithmProcessThread) {
       m_threadLidarAlgorithmProcess->interrupt();
