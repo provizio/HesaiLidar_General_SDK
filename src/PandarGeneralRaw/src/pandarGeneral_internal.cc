@@ -88,7 +88,9 @@ PandarGeneral_Internal::PandarGeneral_Internal(
     boost::function<void(HS_Object3D_Object_List*)> algorithm_callback,
     boost::function<void(double)> gps_callback, uint16_t start_angle, int tz,
     int pcl_type, std::string lidar_type, std::string frame_id, std::string timestampType,
-    std::string lidar_correction_file, std::string multicast_ip, bool coordinate_correction_flag) {
+    std::string lidar_correction_file, std::string multicast_ip, bool coordinate_correction_flag)
+  : timesync(true) // acts if time was synced, as it's live mode
+{
       // LOG_FUNC();
   pthread_mutex_init(&lidar_lock_, NULL);
   sem_init(&lidar_sem_, 0, 0);
@@ -141,11 +143,14 @@ PandarGeneral_Internal::PandarGeneral_Internal(
   Init();
 }
 
-PandarGeneral_Internal::PandarGeneral_Internal(std::string pcap_path, \
-    boost::function<void(boost::shared_ptr<PPointCloud>, double)> \
-    pcl_callback, uint16_t start_angle, int tz, int pcl_type, \
-    std::string lidar_type, std::string frame_id, \
-    std::string timestampType, bool coordinate_correction_flag) {
+PandarGeneral_Internal::PandarGeneral_Internal(std::string pcap_path,
+    boost::function<void(boost::shared_ptr<PPointCloud>, double)> pcl_callback,
+    uint16_t start_angle, int tz, int pcl_type,
+    std::string lidar_type, std::string frame_id,
+    std::string timestampType, bool coordinate_correction_flag,
+    bool timesync)
+  : timesync(timesync)
+{
   pthread_mutex_init(&lidar_lock_, NULL);
   sem_init(&lidar_sem_, 0, 0);
 
@@ -155,7 +160,7 @@ PandarGeneral_Internal::PandarGeneral_Internal(std::string pcap_path, \
   enable_lidar_recv_thr_ = false;
   enable_lidar_process_thr_ = false;
 
-  pcap_reader_ = new PcapReader(pcap_path,lidar_type);
+  pcap_reader_ = new PcapReader(pcap_path, lidar_type, timesync);
 
   start_angle_ = start_angle;
   pcl_callback_ = pcl_callback;
@@ -981,8 +986,16 @@ void PandarGeneral_Internal::ProcessLiarPacket() {
   }
 }
 
-void PandarGeneral_Internal::PushLiDARData(PandarPacket packet) {
-  m_PacketsBuffer.push_back(packet);
+void PandarGeneral_Internal::PushLiDARData(const PandarPacket& packet) {
+  int success = 0;
+  while (enable_lidar_recv_thr_ && (success = m_PacketsBuffer.push_back(packet)) == 0 && !timesync) {
+    boost::this_thread::interruption_point();
+    usleep(1000);
+  }
+
+  if (!success) {
+    printf("Pandar: buffer doesn't have space!\n");
+  }
 }
 
 void PandarGeneral_Internal::ProcessGps(const PandarGPS &gpsMsg) {

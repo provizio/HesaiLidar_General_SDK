@@ -14,8 +14,8 @@
  * limitations under the License.
  *****************************************************************************/
 
-#ifndef SRC_PANDARGENERAL_INTERNAL_H_
-#define SRC_PANDARGENERAL_INTERNAL_H_
+#ifndef PANDARGENERAL_PANDARGENERAL_INTERNAL
+#define PANDARGENERAL_PANDARGENERAL_INTERNAL
 
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
@@ -357,7 +357,6 @@ public:
     std::lock_guard<std::mutex> lock{mutex};
 
     if (m_full) {
-      printf("Pandar: buffer doesn't have space!\n");
       return 0;
     }
 
@@ -422,12 +421,15 @@ class PandarGeneral_Internal {
    *        tz                The timezone
    *        pcl_type          Structured Pointcloud
    *        frame_id          The frame id of pcd
+   *        timesync          Whether to wait prior to sending packets to act like live mode
    */
   PandarGeneral_Internal(
-      std::string pcap_path, \
-      boost::function<void(boost::shared_ptr<PPointCloud>, double)> \
-      pcl_callback, uint16_t start_angle, int tz, int pcl_type, \
-      std::string lidar_type, std::string frame_id, std::string timestampType, bool coordinate_correction_flag);// the default timestamp type is LiDAR time
+      std::string pcap_path,
+      boost::function<void(boost::shared_ptr<PPointCloud>, double)> pcl_callback,
+      uint16_t start_angle, int tz, int pcl_type,
+      std::string lidar_type, std::string frame_id, std::string timestampType,
+      bool coordinate_correction_flag, // the default timestamp type is LiDAR time
+      bool timesync);
   ~PandarGeneral_Internal();
 
   /**
@@ -509,7 +511,7 @@ class PandarGeneral_Internal {
   void RecvTask();
   void ProcessGps(const PandarGPS &gpsMsg);
   void ProcessLiarPacket();
-  void PushLiDARData(PandarPacket packet);
+  void PushLiDARData(const PandarPacket& packet);
   int ParseRawData(Pandar40PPacket *packet, const uint8_t *buf, const int len);
   int ParseL64Data(HS_LIDAR_L64_Packet *packet, const uint8_t *recvbuf, const int len);
   int ParseL20Data(HS_LIDAR_L20_Packet *packet, const uint8_t *recvbuf, const int len);
@@ -531,6 +533,8 @@ class PandarGeneral_Internal {
 
   void EmitBackMessege(char chLaserNumber, boost::shared_ptr<PPointCloud> cld);
   void SetEnvironmentVariableTZ();
+
+  const bool timesync;
   pthread_mutex_t lidar_lock_;
   sem_t lidar_sem_;
   boost::thread *lidar_recv_thr_;
@@ -628,4 +632,4 @@ class PandarGeneral_Internal {
 
 };
 
-#endif  // SRC_PANDARGENERAL_INTERNAL_H_
+#endif // PANDARGENERAL_PANDARGENERAL_INTERNAL

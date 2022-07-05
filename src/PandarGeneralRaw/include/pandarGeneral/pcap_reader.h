@@ -23,14 +23,15 @@ using namespace std;
 
 class PcapReader {
 public:
-  PcapReader(std::string path, std::string frame_id);
+  PcapReader(std::string path, std::string frame_id, bool timesync);
   ~PcapReader();
 
   void start(boost::function<void(const uint8_t*, const int, double timestamp)> callback);
   void stop();
 
 private:
-  bool          loop;
+  const bool timesync;
+  bool loop;
   boost::thread *parse_thr_;
   std::string   pcapPath;
   std::string   m_sFrameId;

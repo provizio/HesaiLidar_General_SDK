@@ -9,7 +9,9 @@
 
 #define PKT_HEADER_SIZE (42)
 
-PcapReader::PcapReader(std::string path, std::string frame_id) {
+PcapReader::PcapReader(std::string path, std::string frame_id, bool timesync)
+  : timesync(timesync)
+{
   initTimeIndexMap();
   pcapPath   = path;
   m_sFrameId = frame_id;
@@ -109,51 +111,53 @@ void PcapReader::parsePcap() {
     callback(packet, pktSize, time);
     count++;
 
-    if (count >= gap && m_iUTCIndex != 0) {
-      count = 0;
+    if (timesync) {
+      if (count >= gap && m_iUTCIndex != 0) {
+        count = 0;
 
-      t.tm_year  = packet[m_iUTCIndex];
-      t.tm_mon   = packet[m_iUTCIndex+1] - 1;
-      t.tm_mday  = packet[m_iUTCIndex+2];
-      t.tm_hour  = packet[m_iUTCIndex+3];
-      t.tm_min   = packet[m_iUTCIndex+4];
-      t.tm_sec   = packet[m_iUTCIndex+5];
-      // LOG_D("[%d][%d][%d][%d][%d][%d]",t.tm_year,t.tm_mon,t.tm_mday,t.tm_hour,t.tm_min,t.tm_sec);
-      t.tm_isdst = 0;
+        t.tm_year  = packet[m_iUTCIndex];
+        t.tm_mon   = packet[m_iUTCIndex+1] - 1;
+        t.tm_mday  = packet[m_iUTCIndex+2];
+        t.tm_hour  = packet[m_iUTCIndex+3];
+        t.tm_min   = packet[m_iUTCIndex+4];
+        t.tm_sec   = packet[m_iUTCIndex+5];
+        // LOG_D("[%d][%d][%d][%d][%d][%d]",t.tm_year,t.tm_mon,t.tm_mday,t.tm_hour,t.tm_min,t.tm_sec);
+        t.tm_isdst = 0;
 
 
-      pkt_ts = mktime(&t) * 1000000 + ((packet[m_iTsIndex]& 0xff) | \
-          (packet[m_iTsIndex+1]& 0xff) << 8 | \
-          ((packet[m_iTsIndex+2]& 0xff) << 16) | \
-          ((packet[m_iTsIndex+3]& 0xff) << 24));
-      struct timeval sys_time;
-      gettimeofday(&sys_time, NULL);
-      current_time = sys_time.tv_sec * 1000000 + sys_time.tv_usec;
+        pkt_ts = mktime(&t) * 1000000 + ((packet[m_iTsIndex]& 0xff) | \
+            (packet[m_iTsIndex+1]& 0xff) << 8 | \
+            ((packet[m_iTsIndex+2]& 0xff) << 16) | \
+            ((packet[m_iTsIndex+3]& 0xff) << 24));
+        struct timeval sys_time;
+        gettimeofday(&sys_time, NULL);
+        current_time = sys_time.tv_sec * 1000000 + sys_time.tv_usec;
 
-      if (0 == last_pkt_ts) {
-        last_pkt_ts = pkt_ts;
-        last_time = current_time;
-      } else {
-        int64_t sleep_time = (pkt_ts - last_pkt_ts) - \
-            (current_time - last_time);
-        // LOG_D("[%lld],[%lld],[%lld],[%lld]",pkt_ts,last_pkt_ts,current_time,last_time);
-        // LOG_D("sleep time is: [%lld]", sleep_time);
+        if (0 == last_pkt_ts) {
+          last_pkt_ts = pkt_ts;
+          last_time = current_time;
+        } else {
+          int64_t sleep_time = (pkt_ts - last_pkt_ts) - \
+              (current_time - last_time);
+          // LOG_D("[%lld],[%lld],[%lld],[%lld]",pkt_ts,last_pkt_ts,current_time,last_time);
+          // LOG_D("sleep time is: [%lld]", sleep_time);
 
-        if (sleep_time > 0) {
-          struct timeval waitTime;
-          waitTime.tv_sec = sleep_time / 1000000;
-          waitTime.tv_usec = sleep_time % 1000000;
+          if (sleep_time > 0) {
+            struct timeval waitTime;
+            waitTime.tv_sec = sleep_time / 1000000;
+            waitTime.tv_usec = sleep_time % 1000000;
 
-          int err;
+            int err;
 
-          do {
-            err = select(0, NULL, NULL, NULL, &waitTime);
-          } while (err < 0 && errno != EINTR);
+            do {
+              err = select(0, NULL, NULL, NULL, &waitTime);
+            } while (err < 0 && errno != EINTR);
+          }
+
+          last_pkt_ts = pkt_ts;
+          last_time = current_time;
+          last_time += sleep_time;
         }
-
-        last_pkt_ts = pkt_ts;
-        last_time = current_time;
-        last_time += sleep_time;
       }
     }
   }

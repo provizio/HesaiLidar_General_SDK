@@ -51,9 +51,9 @@ void lidarAlgorithmCallback(HS_Object3D_Object_List* object_t) {
 
 
 
-void RunPcapPandarGeneralSDK(char* correctionFile, char* pcapFile, char* lidarType, char* timestampType, int runTime) {
-    PandarGeneralSDK pandarGeneral(pcapFile, \
-    lidarCallback, 0, 0, 1, lidarType, "", timestampType, true);
+void RunPcapPandarGeneralSDK(char* correctionFile, char* pcapFile, char* lidarType, char* timestampType, int runTime, int timesync) {
+    PandarGeneralSDK pandarGeneral(pcapFile,
+        lidarCallback, 0, 0, 1, lidarType, "", timestampType, true, timesync != 0);
     std::string filePath = correctionFile;
     std::ifstream fin(filePath);
     if (fin.is_open()) {
