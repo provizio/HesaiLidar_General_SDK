@@ -18,8 +18,8 @@
 #define INCLUDE_PANDAR40P_SDK_PANDAR40P_SDK_H_
 
 #include <pcl/point_types.h>
-#include <pthread.h>
 #ifndef _WIN32
+#include <pthread.h>
 #include <semaphore.h>
 #endif
 

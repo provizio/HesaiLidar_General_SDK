@@ -747,6 +747,7 @@ void PandarGeneral_Internal::Stop() {
 void PandarGeneral_Internal::RecvTask() {
   // LOG_FUNC();
   int ret = 0;
+#ifndef _WIN32
   sched_param param;
   int ret_policy;
   // SCHED_FIFO和SCHED_RR
@@ -756,6 +757,7 @@ void PandarGeneral_Internal::RecvTask() {
   pthread_getschedparam(pthread_self(), &ret_policy, &param);
   printf("publishRawDataThread:get thead %lu, policy %d and priority %d\n",
            pthread_self(), ret_policy, param.sched_priority);
+#endif
   while (enable_lidar_recv_thr_) {
     boost::this_thread::interruption_point();
     PandarPacket pkt;

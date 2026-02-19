@@ -18,7 +18,9 @@
 #define VERSION_H_
 
 #include <stdio.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <string>
 
 #define VERSION "PandarGeneralSDK_1.1.11"

@@ -15,10 +15,15 @@
  *****************************************************************************/
 
 #include <stdio.h>
-#include <unistd.h>
 #include <thread>
-#include <sys/time.h>
 #include <sys/timeb.h>
+#ifdef _WIN32
+#include <process.h>
+#define getpid() _getpid()
+#else
+#include <unistd.h>
+#include <sys/time.h>
+#endif
 
 class TranceFunc
 {

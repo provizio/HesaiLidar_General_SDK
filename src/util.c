@@ -33,7 +33,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#ifndef _WIN32
 #include <pthread.h>
+#endif
 #include <setjmp.h>
 #include <signal.h>
 #include <stdarg.h>

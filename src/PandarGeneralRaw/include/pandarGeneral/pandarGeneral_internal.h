@@ -18,10 +18,32 @@
 #define PANDARGENERAL_PANDARGENERAL_INTERNAL
 
 #include <pcl/point_types.h>
-#include <pthread.h>
 #ifdef _WIN32
 #include <winsock2.h>
 #include <windows.h>
+#include <errno.h>
+
+/* Minimal POSIX pthread_mutex emulation for Windows using CRITICAL_SECTION */
+typedef CRITICAL_SECTION pthread_mutex_t;
+typedef int pthread_mutexattr_t;
+static inline int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr) {
+  (void)attr;
+  InitializeCriticalSection(mutex);
+  return 0;
+}
+static inline int pthread_mutex_destroy(pthread_mutex_t *mutex) {
+  DeleteCriticalSection(mutex);
+  return 0;
+}
+static inline int pthread_mutex_lock(pthread_mutex_t *mutex) {
+  EnterCriticalSection(mutex);
+  return 0;
+}
+static inline int pthread_mutex_unlock(pthread_mutex_t *mutex) {
+  LeaveCriticalSection(mutex);
+  return 0;
+}
+
 /* Minimal POSIX semaphore emulation for Windows */
 typedef HANDLE sem_t;
 static inline int sem_init(sem_t *sem, int /*pshared*/, unsigned int value) {
@@ -57,6 +79,7 @@ static inline int sem_timedwait(sem_t *sem, const struct timespec *abs_timeout) 
   return -1;
 }
 #else
+#include <pthread.h>
 #include <semaphore.h>
 #endif
 

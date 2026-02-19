@@ -35,7 +35,6 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <pthread.h>
 #include <setjmp.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -43,6 +42,32 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+
+#ifdef _WIN32
+/* Minimal POSIX pthread emulation for Windows (C-compatible) */
+typedef CRITICAL_SECTION pthread_mutex_t;
+typedef HANDLE pthread_t;
+static int pthread_mutex_init(pthread_mutex_t *mutex, const void *attr) {
+  (void)attr;
+  InitializeCriticalSection(mutex);
+  return 0;
+}
+static int pthread_mutex_destroy(pthread_mutex_t *mutex) {
+  DeleteCriticalSection(mutex);
+  return 0;
+}
+static int pthread_mutex_lock(pthread_mutex_t *mutex) {
+  EnterCriticalSection(mutex);
+  return 0;
+}
+static int pthread_mutex_unlock(pthread_mutex_t *mutex) {
+  LeaveCriticalSection(mutex);
+  return 0;
+}
+#else
+#include <pthread.h>
+#endif
+
 #include "src/util.h"
 #include "src/tcp_command_client.h"
 
