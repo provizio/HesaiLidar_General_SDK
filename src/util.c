@@ -14,10 +14,25 @@
  * limitations under the License.
  *****************************************************************************/
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#include <io.h>
+#include <windows.h>
+#else
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <strings.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <sys/socket.h>
+#include <syslog.h>
+#include <unistd.h>
+#endif
+
 #include <errno.h>
 #include <fcntl.h>
-#include <netinet/in.h>
 #include <pthread.h>
 #include <setjmp.h>
 #include <signal.h>
@@ -25,13 +40,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <syslog.h>
-#include <unistd.h>
+#include <time.h>
 
 #include "src/util.h"
 
@@ -42,12 +52,18 @@ int sys_readn(int fd, void* vptr, int n) {
   int nleft, nread;
   char* ptr;
 
-  ptr = vptr;
+  ptr = (char*)vptr;
   nleft = n;
   while (nleft > 0) {
     // printf("start read\n");
+#ifdef _WIN32
+    if ((nread = recv(fd, ptr, nleft, 0)) < 0) {
+      int err = WSAGetLastError();
+      if (err == WSAEINTR)
+#else
     if ((nread = read(fd, ptr, nleft)) < 0) {
       if (errno == EINTR)
+#endif
         nread = 0;
       else
         return -1;
@@ -68,11 +84,17 @@ int sys_writen(int fd, const void* vptr, int n) {
   int nwritten;
   const char* ptr;
 
-  ptr = vptr;
+  ptr = (const char*)vptr;
   nleft = n;
   while (nleft > 0) {
+#ifdef _WIN32
+    if ((nwritten = send(fd, ptr, nleft, 0)) <= 0) {
+      int err = WSAGetLastError();
+      if (nwritten < 0 && err == WSAEINTR)
+#else
     if ((nwritten = write(fd, ptr, nleft)) <= 0) {
       if (nwritten < 0 && errno == EINTR)
+#endif
         nwritten = 0; /* and call write() again */
       else
         return (-1); /* error */
@@ -89,18 +111,26 @@ int tcp_open(const char* ipaddr, int port) {
   int sockfd;
   struct sockaddr_in servaddr;
 
-  if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) return -1;
+  if ((sockfd = (int)socket(AF_INET, SOCK_STREAM, 0)) == -1) return -1;
 
-  bzero(&servaddr, sizeof(servaddr));
+  memset(&servaddr, 0, sizeof(servaddr));
   servaddr.sin_family = AF_INET;
   servaddr.sin_port = htons(port);
   if (inet_pton(AF_INET, ipaddr, &servaddr.sin_addr) <= 0) {
+#ifdef _WIN32
+    closesocket(sockfd);
+#else
     close(sockfd);
+#endif
     return -1;
   }
 
   if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) == -1) {
+#ifdef _WIN32
+    closesocket(sockfd);
+#else
     close(sockfd);
+#endif
     return -1;
   }
 
@@ -145,12 +175,22 @@ int select_fd(int fd, int timeout, int wait_for) {
   return result;
 }
 double getNowTimeSec() {
-   struct timespec ts;
-    double time;
+#ifdef _WIN32
+    FILETIME ft;
+    ULARGE_INTEGER uli;
+    GetSystemTimeAsFileTime(&ft);
+    uli.LowPart = ft.dwLowDateTime;
+    uli.HighPart = ft.dwHighDateTime;
+    /* FILETIME is in 100-nanosecond intervals since 1601-01-01.
+       Subtract the epoch difference (11644473600 seconds) to get Unix time. */
+    return (double)(uli.QuadPart - 116444736000000000ULL) / 10000000.0;
+#else
+    struct timespec ts;
     if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
       return ts.tv_nsec / 1000000000.0 + ts.tv_sec;
     }
     else{
       return 0;
-    }  
+    }
+#endif
 }

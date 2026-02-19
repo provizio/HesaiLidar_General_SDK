@@ -17,10 +17,11 @@
 #ifndef INCLUDE_PANDAR40P_SDK_PANDAR40P_SDK_H_
 #define INCLUDE_PANDAR40P_SDK_PANDAR40P_SDK_H_
 
-#include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pthread.h>
+#ifndef _WIN32
 #include <semaphore.h>
+#endif
 
 #include <string>
 #include <vector>

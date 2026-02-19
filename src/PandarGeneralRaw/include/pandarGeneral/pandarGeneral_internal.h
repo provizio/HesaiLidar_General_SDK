@@ -17,10 +17,48 @@
 #ifndef PANDARGENERAL_PANDARGENERAL_INTERNAL
 #define PANDARGENERAL_PANDARGENERAL_INTERNAL
 
-#include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pthread.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#include <windows.h>
+/* Minimal POSIX semaphore emulation for Windows */
+typedef HANDLE sem_t;
+static inline int sem_init(sem_t *sem, int /*pshared*/, unsigned int value) {
+  *sem = CreateSemaphore(NULL, (LONG)value, LONG_MAX, NULL);
+  return (*sem == NULL) ? -1 : 0;
+}
+static inline int sem_destroy(sem_t *sem) {
+  return CloseHandle(*sem) ? 0 : -1;
+}
+static inline int sem_post(sem_t *sem) {
+  return ReleaseSemaphore(*sem, 1, NULL) ? 0 : -1;
+}
+static inline int sem_wait(sem_t *sem) {
+  return (WaitForSingleObject(*sem, INFINITE) == WAIT_OBJECT_0) ? 0 : -1;
+}
+static inline int sem_timedwait(sem_t *sem, const struct timespec *abs_timeout) {
+  /* Convert absolute timespec to relative milliseconds */
+  FILETIME ft;
+  ULARGE_INTEGER now_uli;
+  GetSystemTimeAsFileTime(&ft);
+  now_uli.LowPart = ft.dwLowDateTime;
+  now_uli.HighPart = ft.dwHighDateTime;
+  /* Current time in 100-ns intervals since 1601 */
+  long long now_100ns = (long long)now_uli.QuadPart;
+  /* Target time in 100-ns intervals since 1601 */
+  long long target_100ns = ((long long)abs_timeout->tv_sec + 11644473600LL) * 10000000LL
+                           + abs_timeout->tv_nsec / 100;
+  long long diff_ms = (target_100ns - now_100ns) / 10000;
+  if (diff_ms < 0) diff_ms = 0;
+  DWORD result = WaitForSingleObject(*sem, (DWORD)diff_ms);
+  if (result == WAIT_OBJECT_0) return 0;
+  errno = ETIMEDOUT;
+  return -1;
+}
+#else
 #include <semaphore.h>
+#endif
 
 #include <list>
 #include <string>

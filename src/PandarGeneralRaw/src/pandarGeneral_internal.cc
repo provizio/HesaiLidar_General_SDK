@@ -16,6 +16,12 @@
 
 #include <sstream>
 
+#ifdef _WIN32
+#include <windows.h>
+/* usleep is not available on Windows; use Sleep (millisecond granularity) */
+static inline void usleep(unsigned int usec) { Sleep(usec / 1000 > 0 ? usec / 1000 : 1); }
+#endif
+
 #include "input.h"
 #include "pandarGeneral_internal.h"
 #include "log.h"
@@ -1957,10 +1963,22 @@ void PandarGeneral_Internal::pushAlgorithmData(PandarPacket packet) {
 
 int PandarGeneral_Internal::popAlgorithmData(PandarPacket *packet) {
     struct timespec ts;
+#ifdef _WIN32
+    FILETIME ft;
+    ULARGE_INTEGER uli;
+    GetSystemTimeAsFileTime(&ft);
+    uli.LowPart = ft.dwLowDateTime;
+    uli.HighPart = ft.dwHighDateTime;
+    /* Convert from 100-ns intervals since 1601 to seconds since Unix epoch */
+    unsigned long long unix_100ns = uli.QuadPart - 116444736000000000ULL;
+    ts.tv_sec = (long)(unix_100ns / 10000000ULL);
+    ts.tv_nsec = (long)((unix_100ns % 10000000ULL) * 100);
+#else
     if(clock_gettime(CLOCK_REALTIME, &ts) == -1) {
         printf("get time error\n");
         return -1;
     }
+#endif
     ts.tv_sec += 1;
     if(sem_timedwait(&m_semAlgorithmList, &ts) == -1) {
         return -1;
@@ -2070,12 +2088,12 @@ int PandarGeneral_Internal::DecodeUdpData(unsigned char* app_data_buff, int data
 }
 
 void PandarGeneral_Internal::SetEnvironmentVariableTZ(){
-  char *TZ; 
+  char *TZ;
   if((TZ = getenv("TZ"))){
-    printf("TZ=%s\n",TZ); 
+    printf("TZ=%s\n",TZ);
     return;
-  } 
-  unsigned int timezone = 0;
+  }
+  unsigned int tz_offset = 0;
   time_t t1, t2 ;
   struct tm *tm_local, *tm_utc;
   time(&t1);
@@ -2084,12 +2102,17 @@ void PandarGeneral_Internal::SetEnvironmentVariableTZ(){
   t1 = mktime(tm_local) ;
   tm_utc = gmtime(&t2);
   t2 = mktime(tm_utc);
-  timezone = 0;
-  std::string data = "TZ=UTC" + std::to_string(timezone);
+  tz_offset = 0;
+  std::string data = "TZ=UTC" + std::to_string(tz_offset);
   int len = data.length();
   TZ = (char *)malloc((len + 1) * sizeof(char));
-  data.copy(TZ, len, 0); 
+  data.copy(TZ, len, 0);
+  TZ[len] = '\0';
+#ifdef _WIN32
+  if(_putenv(TZ) == 0){
+#else
   if(putenv(TZ) == 0){
+#endif
     printf("set environment %s\n", TZ);
   }
   else{

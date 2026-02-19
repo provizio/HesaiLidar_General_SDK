@@ -17,9 +17,15 @@
 #ifndef SRC_INPUT_H_
 #define SRC_INPUT_H_
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#else
 #include <netinet/in.h>
-#include <stdio.h>
 #include <unistd.h>
+#endif
+#include <stdio.h>
 #include <string>
 
 #define ETHERNET_MTU (1500)

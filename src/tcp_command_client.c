@@ -14,10 +14,27 @@
  * limitations under the License.
  *****************************************************************************/
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#include <io.h>
+#include <windows.h>
+#else
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <sys/socket.h>
+#include <syslog.h>
+#include <unistd.h>
+#include <linux/sockios.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#endif
+
 #include <errno.h>
 #include <fcntl.h>
-#include <netinet/in.h>
 #include <pthread.h>
 #include <setjmp.h>
 #include <signal.h>
@@ -25,15 +42,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <syslog.h>
-#include <unistd.h>
-#include <linux/sockios.h>
-#include <net/if.h>
-#include <sys/ioctl.h>
 #include "src/util.h"
 #include "src/tcp_command_client.h"
 
@@ -99,12 +108,12 @@ static int tcpCommandReadCommand(int connfd, TC_Command* cmd) {
     return -1;
   }
 
-  print_mem(buffer, 8);
+  print_mem((char*)buffer, 8);
 
   tcpCommandHeaderParser(buffer + 2, 6, &cmd->header);
 
   if (cmd->header.len > 0) {
-    cmd->data = malloc(cmd->header.len);
+    cmd->data = (unsigned char*)malloc(cmd->header.len);
     if (!cmd->data) {
       printf("malloc data error\n");
       return -1;
@@ -120,7 +129,7 @@ static int tcpCommandReadCommand(int connfd, TC_Command* cmd) {
 
   // cmd->ret_size = cmd->header.len;
 
-  print_mem(cmd->data, cmd->header.len);
+  print_mem((char*)cmd->data, cmd->header.len);
 
   return 0;
 }
@@ -170,23 +179,39 @@ static PTC_ErrCode tcpCommandClient_SendCmd(TcpCommandClient* client,
   }
 
   unsigned char buffer[128];
-  int size = TcpCommand_buildHeader(buffer, cmd);
+  int size = TcpCommand_buildHeader((char*)buffer, cmd);
 
-  print_mem(buffer, size);
+  print_mem((char*)buffer, size);
+#ifdef _WIN32
+  int ret = send(fd, (const char*)buffer, size, 0);
+#else
   int ret = write(fd, buffer, size);
+#endif
   if (ret != size) {
+#ifdef _WIN32
+    closesocket(fd);
+#else
     close(fd);
+#endif
     pthread_mutex_unlock(&client->lock);
     printf("Write header error\n");
     return PTC_ERROR_TRANSFER_FAILED;
   }
 
   if (cmd->header.len > 0 && cmd->data) {
-    print_mem(cmd->data, cmd->header.len);
+    print_mem((char*)cmd->data, cmd->header.len);
+#ifdef _WIN32
+    ret = send(fd, (const char*)cmd->data, cmd->header.len, 0);
+#else
     ret = write(fd, cmd->data, cmd->header.len);
+#endif
     if (ret != cmd->header.len) {
       printf("Write Payload error\n");
+#ifdef _WIN32
+      closesocket(fd);
+#else
       close(fd);
+#endif
       pthread_mutex_unlock(&client->lock);
       return PTC_ERROR_TRANSFER_FAILED;
     }
@@ -196,7 +221,11 @@ static PTC_ErrCode tcpCommandClient_SendCmd(TcpCommandClient* client,
   ret = tcpCommandReadCommand(fd, &feedBack);
   if (ret != 0) {
     printf("Receive feed back failed!!!\n");
+#ifdef _WIN32
+    closesocket(fd);
+#else
     close(fd);
+#endif
     pthread_mutex_unlock(&client->lock);
     return PTC_ERROR_TRANSFER_FAILED;
   }
@@ -208,7 +237,11 @@ static PTC_ErrCode tcpCommandClient_SendCmd(TcpCommandClient* client,
   cmd->ret_size = feedBack.header.len;
   cmd->header.ret_code = feedBack.header.ret_code;
 
+#ifdef _WIN32
+  closesocket(fd);
+#else
   close(fd);
+#endif
   pthread_mutex_unlock(&client->lock);
   return PTC_ERROR_NO_ERROR;
 }
@@ -257,7 +290,7 @@ PTC_ErrCode TcpCommandSetCalibration(const void* handle, const char* buffer,
   memset(&cmd, 0, sizeof(TC_Command));
   cmd.header.cmd = PTC_COMMAND_SET_CALIBRATION;
   cmd.header.len = len;
-  cmd.data = strdup(buffer);
+  cmd.data = (unsigned char*)strdup(buffer);
 
   PTC_ErrCode errorCode = tcpCommandClient_SendCmd(client, &cmd);
   if (errorCode != PTC_ERROR_NO_ERROR) {

@@ -14,14 +14,23 @@
  * limitations under the License.
  *****************************************************************************/
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#include <windows.h>
+#else
 #include <arpa/inet.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
-#include <string.h>
 #include <sys/file.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <unistd.h>
+#endif
+
+#include <errno.h>
+#include <string.h>
 #include <iostream>
 #include <sstream>
 #include <time.h>
@@ -33,7 +42,7 @@
 Input::Input(uint16_t port, uint16_t gpsPort, std::string multicast_ip) {
   // LOG_D("port: %d, gpsPort: %d", port,gpsPort);
   socketForLidar = -1;
-  socketForLidar = socket(PF_INET, SOCK_DGRAM, 0);
+  socketForLidar = (int)socket(PF_INET, SOCK_DGRAM, 0);
   if (socketForLidar == -1) {
     perror("socket");  // TODO(Philip.Pi): perror errno.
     return;
@@ -51,22 +60,30 @@ Input::Input(uint16_t port, uint16_t gpsPort, std::string multicast_ip) {
     return;
   }
   if(multicast_ip != ""){
-    struct ip_mreq mreq;                      
+    struct ip_mreq mreq;
     mreq.imr_multiaddr.s_addr=inet_addr(multicast_ip.c_str());
-    mreq.imr_interface.s_addr = htonl(INADDR_ANY); 
+    mreq.imr_interface.s_addr = htonl(INADDR_ANY);
     int ret = setsockopt(socketForLidar, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char *)&mreq, sizeof(mreq));
     if (ret < 0) {
       perror("Multicast IP error,set correct multicast ip address or keep it empty\n");
-    } 
+    }
     else {
       printf("Recive data from multicast ip address %s\n", multicast_ip.c_str());
     }
   }
 
+#ifdef _WIN32
+  u_long nonblocking = 1;
+  if (ioctlsocket(socketForLidar, FIONBIO, &nonblocking) != 0) {
+    perror("non-block");
+    return;
+  }
+#else
   if (fcntl(socketForLidar, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
     perror("non-block");
     return;
   }
+#endif
 
   if (port == gpsPort) {
     socketNumber = 1;
@@ -80,14 +97,18 @@ Input::Input(uint16_t port, uint16_t gpsPort, std::string multicast_ip) {
 
   // gps socket
   socketForGPS = -1;
-  socketForGPS = socket(PF_INET, SOCK_DGRAM, 0);
+  socketForGPS = (int)socket(PF_INET, SOCK_DGRAM, 0);
   if (socketForGPS == -1) {
     perror("socket");  // TODO(Philip.Pi): perror errno.
     return;
   }
 
   int reuse = 1;
+#ifdef _WIN32
+  int set_error = setsockopt(socketForGPS, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse, sizeof(int));
+#else
   int set_error = setsockopt(socketForGPS, SOL_SOCKET, SO_REUSEPORT, (const void *)&reuse, sizeof(int));
+#endif
   if(set_error < 0) {
     perror("setsockopt");
   }
@@ -104,23 +125,40 @@ Input::Input(uint16_t port, uint16_t gpsPort, std::string multicast_ip) {
     return;
   }
 
+#ifdef _WIN32
+  nonblocking = 1;
+  if (ioctlsocket(socketForGPS, FIONBIO, &nonblocking) != 0) {
+    perror("non-block");
+    return;
+  }
+#else
   if (fcntl(socketForGPS, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
     perror("non-block");
     return;
   }
+#endif
   socketNumber = 2;
 }
 
 Input::~Input(void) {
+#ifdef _WIN32
+  if (socketForGPS > 0) closesocket(socketForGPS);
+  if (socketForLidar > 0) closesocket(socketForLidar);
+#else
   if (socketForGPS > 0) close(socketForGPS);
   if (socketForLidar > 0) (void)close(socketForLidar);
+#endif
 }
 
 // return : 0 - lidar
 //          1 - gps
 //          -1 - error
 int Input::getPacket(PandarPacket *pkt) {
+#ifdef _WIN32
+  WSAPOLLFD fds[2];
+#else
   struct pollfd fds[socketNumber];
+#endif
   if (socketNumber == 2) {
     fds[0].fd = socketForGPS;
     fds[0].events = POLLIN;
@@ -134,8 +172,12 @@ int Input::getPacket(PandarPacket *pkt) {
   static const int POLL_TIMEOUT = 1000;  // one second (in msec)
 
   sockaddr_in senderAddress;
-  socklen_t senderAddressLen = sizeof(senderAddress);
+  int senderAddressLen = sizeof(senderAddress);
+#ifdef _WIN32
+  int retval = WSAPoll(fds, socketNumber, POLL_TIMEOUT);
+#else
   int retval = poll(fds, socketNumber, POLL_TIMEOUT);
+#endif
   if (retval < 0) {  // poll() error?
     if (errno != EINTR) printf("poll() error: %s", strerror(errno));
     return -1;
@@ -151,20 +193,28 @@ int Input::getPacket(PandarPacket *pkt) {
   }
 
   senderAddressLen = sizeof(senderAddress);
-  ssize_t nbytes;
+  int nbytes = 0;
   double time = getNowTimeSec();
   // printf("Real time: %lf\n",time);
   for (int i = 0; i != socketNumber; ++i) {
     if (fds[i].revents & POLLIN) {
-      nbytes = recvfrom(fds[i].fd, &pkt->data[0], ETHERNET_MTU, 0,
+      nbytes = recvfrom(fds[i].fd, (char*)&pkt->data[0], ETHERNET_MTU, 0,
                         reinterpret_cast<sockaddr *>(&senderAddress),
+#ifdef _WIN32
                         &senderAddressLen);
+#else
+                        (socklen_t*)&senderAddressLen);
+#endif
       break;
     }
   }
 
   if (nbytes < 0) {
+#ifdef _WIN32
+    if (WSAGetLastError() != WSAEWOULDBLOCK) {
+#else
     if (errno != EWOULDBLOCK) {
+#endif
       perror("recvfail");
       return -1;
     }

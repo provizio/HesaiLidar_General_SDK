@@ -1,7 +1,13 @@
+#ifdef _WIN32
+#include <winsock2.h>
+#include <windows.h>
+#pragma comment(lib, "ws2_32.lib")
+#else
 #include <sys/time.h>
+#include <unistd.h>
+#endif
 #include <sys/types.h>
 #include <time.h>
-#include <unistd.h>
 #include "pcap_reader.h"
 #include "log.h"
 #include <map>
@@ -129,9 +135,19 @@ void PcapReader::parsePcap() {
             (packet[m_iTsIndex+1]& 0xff) << 8 | \
             ((packet[m_iTsIndex+2]& 0xff) << 16) | \
             ((packet[m_iTsIndex+3]& 0xff) << 24));
+#ifdef _WIN32
+        FILETIME ft;
+        ULARGE_INTEGER uli;
+        GetSystemTimeAsFileTime(&ft);
+        uli.LowPart = ft.dwLowDateTime;
+        uli.HighPart = ft.dwHighDateTime;
+        /* Convert from 100-ns intervals since 1601 to microseconds since Unix epoch */
+        current_time = (int64_t)((uli.QuadPart - 116444736000000000ULL) / 10);
+#else
         struct timeval sys_time;
         gettimeofday(&sys_time, NULL);
         current_time = sys_time.tv_sec * 1000000 + sys_time.tv_usec;
+#endif
 
         if (0 == last_pkt_ts) {
           last_pkt_ts = pkt_ts;
@@ -143,6 +159,9 @@ void PcapReader::parsePcap() {
           // LOG_D("sleep time is: [%lld]", sleep_time);
 
           if (sleep_time > 0) {
+#ifdef _WIN32
+            Sleep((DWORD)(sleep_time / 1000));
+#else
             struct timeval waitTime;
             waitTime.tv_sec = sleep_time / 1000000;
             waitTime.tv_usec = sleep_time % 1000000;
@@ -152,6 +171,7 @@ void PcapReader::parsePcap() {
             do {
               err = select(0, NULL, NULL, NULL, &waitTime);
             } while (err < 0 && errno != EINTR);
+#endif
           }
 
           last_pkt_ts = pkt_ts;

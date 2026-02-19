@@ -1,8 +1,12 @@
 #include "wrapper.h"
 #include "pandarGeneral_sdk/pandarGeneral_sdk.h"
-#include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <iostream>
+#ifdef _WIN32
+#include <windows.h>
+/* sleep(seconds) is not available on Windows */
+static inline void sleep(unsigned int seconds) { Sleep(seconds * 1000); }
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
