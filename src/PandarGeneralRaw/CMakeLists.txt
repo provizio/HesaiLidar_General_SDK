@@ -10,7 +10,7 @@ if(NOT MSVC)
   set(CMAKE_CXX_FLAGS "-fPIC --std=c++14")
 else()
   set(CMAKE_CXX_STANDARD 14)
-  add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS)
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
 endif()
 
 include_directories(

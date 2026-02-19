@@ -3,6 +3,9 @@
 #include <pcl/point_types.h>
 #include <iostream>
 #ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 /* sleep(seconds) is not available on Windows */
 static inline void sleep(unsigned int seconds) { Sleep(seconds * 1000); }
