@@ -15,8 +15,16 @@
  *****************************************************************************/
 
 #include "pandarGeneral_sdk/pandarGeneral_sdk.h"
-// #define PRINT_FLAG 
-// #define PCD_FILE_WRITE_FLAG 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+/* sleep(seconds) is not available on Windows */
+static inline void sleep(unsigned int seconds) { Sleep(seconds * 1000); }
+#endif
+// #define PRINT_FLAG
+// #define PCD_FILE_WRITE_FLAG
 
 int frameItem = 0;
 

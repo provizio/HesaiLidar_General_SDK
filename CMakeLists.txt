@@ -5,6 +5,7 @@ find_package(Boost REQUIRED COMPONENTS thread)
 find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED COMPONENTS common)
 find_package(Threads REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 if(NOT MSVC)
   set(CMAKE_CXX_FLAGS "-fPIC --std=c++14")
@@ -35,6 +36,7 @@ target_link_libraries(${PROJECT_NAME}
     Boost::thread
     Eigen3::Eigen
     Threads::Threads
+    yaml-cpp::yaml-cpp
 )
 
 if(WIN32)

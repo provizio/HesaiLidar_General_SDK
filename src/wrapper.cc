@@ -1,6 +1,7 @@
 #include "wrapper.h"
 #include "pandarGeneral_sdk/pandarGeneral_sdk.h"
 #include <pcl/point_types.h>
+#include <fstream>
 #include <iostream>
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
