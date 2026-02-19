@@ -17,6 +17,7 @@
 #ifndef INCLUDE_POINT_TYPES_H_
 #define INCLUDE_POINT_TYPES_H_
 
+#include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <cstdint>
 
