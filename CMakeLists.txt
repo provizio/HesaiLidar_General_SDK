@@ -39,11 +39,10 @@ target_link_libraries(${PROJECT_NAME}
     yaml-cpp::yaml-cpp
 )
 
+find_package(libpcap REQUIRED)
+target_link_libraries(${PROJECT_NAME} libpcap::libpcap)
 if(WIN32)
-  find_package(libpcap REQUIRED)
-  target_link_libraries(${PROJECT_NAME} libpcap::libpcap ws2_32)
-else()
-  target_link_libraries(${PROJECT_NAME} pcap)
+  target_link_libraries(${PROJECT_NAME} ws2_32)
 endif()
 
 if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
