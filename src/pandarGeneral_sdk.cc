@@ -113,6 +113,8 @@ void PandarGeneralSDK::Stop() {
   enable_get_calibration_thr_ = false;
   if (get_calibration_thr_) {
     get_calibration_thr_->join();
+    delete get_calibration_thr_;
+    get_calibration_thr_ = NULL;
   }
 }
 

@@ -87,10 +87,6 @@ static const float pandar20_horizatal_azimuth_offset_map[] = {
   -1.042f, -1.042f, -1.042f, -1.042f
 };
 
-static std::vector<std::vector<PPoint> > PointCloudList(MAX_LASER_NUM);
-static std::vector<PPoint> PointCloud(MAX_POINT_CLOUD_NUM);
-static int iPointCloudIndex = 0;
-
 PandarGeneral_Internal::PandarGeneral_Internal(
     std::string device_ip, uint16_t lidar_port, uint16_t lidar_algorithm_port, uint16_t gps_port,
     boost::function<void(boost::shared_ptr<PPointCloud>, double)> pcl_callback,
@@ -149,6 +145,9 @@ PandarGeneral_Internal::PandarGeneral_Internal(
   if(NULL != algorithm_callback) {
     m_fAlgorithmCallback = algorithm_callback;
   }
+  PointCloudList.resize(MAX_LASER_NUM);
+  PointCloud.resize(MAX_POINT_CLOUD_NUM);
+  iPointCloudIndex = 0;
   Init();
 }
 
@@ -186,6 +185,26 @@ PandarGeneral_Internal::PandarGeneral_Internal(std::string pcap_path,
   m_dPktTimestamp = 0.0f;
   m_bCoordinateCorrectionFlag = coordinate_correction_flag;
 
+  // A pcap has no algorithm channel, but Start(), Stop() and the destructor
+  // read its state, which would otherwise be whatever the memory held: a
+  // non-zero port starts the algorithm threads on an uninitialised semaphore
+  pthread_mutex_init(&m_mutexAlgorithmListLock, NULL);
+  sem_init(&m_semAlgorithmList, 0, 0);
+  m_threadLidarAlgorithmRecv = NULL;
+  m_threadLidarAlgorithmProcess = NULL;
+  m_fAlgorithmCallback = NULL;
+  m_bEnableLidarAlgorithmRecvThread = false;
+  m_bEnableLidarAlgorithmProcessThread = false;
+  m_bGetVersion = false;
+  m_iMajorVersion = 0;
+  m_iMinorVersion = 0;
+  m_iHeaderSize = 0;
+  m_iRegularInfoLen = 0;
+  m_u16LidarAlgorithmPort = 0;
+
+  PointCloudList.resize(MAX_LASER_NUM);
+  PointCloud.resize(MAX_POINT_CLOUD_NUM);
+  iPointCloudIndex = 0;
   Init();
 }
 
@@ -193,6 +212,8 @@ PandarGeneral_Internal::~PandarGeneral_Internal() {
   Stop();
   sem_destroy(&lidar_sem_);
   pthread_mutex_destroy(&lidar_lock_);
+  sem_destroy(&m_semAlgorithmList);
+  pthread_mutex_destroy(&m_mutexAlgorithmListLock);
 
   if (pcap_reader_ != NULL) {
     delete pcap_reader_;
@@ -683,6 +704,14 @@ void PandarGeneral_Internal::Start() {
 
   // LOG_FUNC();
   Stop();
+
+  iPointCloudIndex = 0;
+  for (size_t i = 0; i < PointCloudList.size(); ++i) {
+    PointCloudList[i].clear();
+  }
+  last_azimuth_ = 0;
+  last_timestamp_ = 0;
+
   enable_lidar_recv_thr_ = true;
   enable_lidar_process_thr_ = true;
   lidar_process_thr_ = new boost::thread(
@@ -704,6 +733,13 @@ void PandarGeneral_Internal::Start() {
 }
 
 void PandarGeneral_Internal::Stop() {
+  // The reader first, while the flag its wait for room in the buffer checks
+  // is still set: cleared before, it would have the reader drop every packet
+  // it reads until it stops. The interruption ends the wait
+  if (pcap_reader_ != NULL) {
+    pcap_reader_->stop();
+  }
+
   enable_lidar_recv_thr_ = false;
   enable_lidar_process_thr_ = false;
   m_bEnableLidarAlgorithmRecvThread = false;
@@ -723,26 +759,23 @@ void PandarGeneral_Internal::Stop() {
     lidar_recv_thr_ = NULL;
   }
 
-  if (pcap_reader_ != NULL) {
-    pcap_reader_->stop();
-  }
-
   m_PacketsBuffer.reset();
 
-  if (m_bEnableLidarAlgorithmRecvThread) {
+  // Tested by the threads themselves, as their enable flags are cleared above
+  if (m_threadLidarAlgorithmRecv) {
     m_threadLidarAlgorithmRecv->interrupt();
-        m_threadLidarAlgorithmRecv->join();
-        delete m_threadLidarAlgorithmRecv;
-        m_threadLidarAlgorithmRecv = NULL;
+    m_threadLidarAlgorithmRecv->join();
+    delete m_threadLidarAlgorithmRecv;
+    m_threadLidarAlgorithmRecv = NULL;
   }
 
-    if(m_bEnableLidarAlgorithmProcessThread) {
-      m_threadLidarAlgorithmProcess->interrupt();
-        m_threadLidarAlgorithmProcess->join();
-        delete m_threadLidarAlgorithmProcess;
-        m_threadLidarAlgorithmProcess = NULL;
-    }
-    m_listAlgorithmPacket.clear();
+  if (m_threadLidarAlgorithmProcess) {
+    m_threadLidarAlgorithmProcess->interrupt();
+    m_threadLidarAlgorithmProcess->join();
+    delete m_threadLidarAlgorithmProcess;
+    m_threadLidarAlgorithmProcess = NULL;
+  }
+  m_listAlgorithmPacket.clear();
 
   return;
 }
@@ -1921,6 +1954,9 @@ void PandarGeneral_Internal::ProcessAlgorithmPacket() {
 
 void PandarGeneral_Internal::getProtocolVersion() {
     while(!m_bGetVersion) {
+        // Waits for a packet a second at a time, so Stop() can end the wait
+        boost::this_thread::interruption_point();
+
         PandarPacket packet;
         if(0 != popAlgorithmData(&packet)) {
             continue;

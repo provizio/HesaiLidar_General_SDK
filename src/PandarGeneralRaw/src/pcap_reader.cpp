@@ -75,6 +75,23 @@ void PcapReader::stop() {
   }
 }
 
+namespace {
+// Closes the file however the reading ends: stop() ends it by interrupting
+// the thread, which unwinds past the end of parsePcap()
+struct pcap_file_closer {
+  pcap_t *file;
+  struct bpf_program *filter;
+  ~pcap_file_closer() {
+    if (filter != NULL) {
+      pcap_freecode(filter);
+    }
+    if (file != NULL) {
+      pcap_close(file);
+    }
+  }
+};
+}  // namespace
+
 void PcapReader::parsePcap() {
   // LOG_FUNC();
   pcap_t *pcapFile = NULL;
@@ -96,11 +113,13 @@ void PcapReader::parsePcap() {
     printf("open pcap file %s fail\n", pcapPath.c_str());
     return;
   }
+  pcap_file_closer closer = {pcapFile, NULL};
 
   if (pcap_compile(pcapFile, &filter, "udp", 0, 0xffffffff) == -1) {
     printf("compile pcap file fail\n");
     return;
   }
+  closer.filter = &filter;
 
   if (pcap_setfilter(pcapFile, &filter) == -1) {
     printf("pcap set filter fail\n");
@@ -185,9 +204,4 @@ void PcapReader::parsePcap() {
     }
   }
   // LOG_D("read pcap file done");
-
-  if (pcapFile != NULL) {
-    pcap_close(pcapFile);
-    pcapFile = NULL;
-  }
 }

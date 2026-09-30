@@ -643,6 +643,13 @@ class PandarGeneral_Internal {
   uint16_t last_azimuth_;
   double last_timestamp_;
 
+  // The frame being put together until it is emitted: an instance's own, as
+  // two lidars each put one together, and reset by Start(), as a frame a stop
+  // cut short would otherwise be emitted as the first after the start
+  std::vector<std::vector<PPoint> > PointCloudList;
+  std::vector<PPoint> PointCloud;
+  int iPointCloudIndex;
+
   float elev_angle_map_[LASER_COUNT];
   float horizatal_azimuth_offset_map_[LASER_COUNT];
 
