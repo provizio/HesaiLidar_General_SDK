@@ -83,6 +83,13 @@ class PandarGeneralSDK {
   void GetCalibrationFromDevice();
   void Start();
   void Stop();
+  /**
+   * @brief Sets what is called once the pcap given to the constructor has been
+   * read to its end, or turns out not to be readable, and its point clouds have
+   * all been given to the point cloud callback: once a Start(), not when Stop()
+   * ends the reading. Set before Start().
+   */
+  void SetPcapEndCallback(boost::function<void()> callback);
   
   /** @brief get major version.
   * @Return   ： major version

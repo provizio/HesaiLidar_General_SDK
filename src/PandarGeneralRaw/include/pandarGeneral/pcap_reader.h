@@ -17,6 +17,7 @@
 #include <boost/function.hpp>
 #include <boost/thread.hpp>
 #include "pcap.h"
+#include <atomic>
 #include <string>
 
 using namespace std;
@@ -26,16 +27,21 @@ public:
   PcapReader(std::string path, std::string frame_id, bool timesync);
   ~PcapReader();
 
-  void start(boost::function<void(const uint8_t*, const int, double timestamp)> callback);
+  // end_callback, if given, is called once the reading ends of itself: the file
+  // read to its end, or one that can't be read. Not when stop() ends it
+  void start(boost::function<void(const uint8_t*, const int, double timestamp)> callback,
+             boost::function<void()> end_callback = boost::function<void()>());
   void stop();
 
 private:
   const bool timesync;
-  bool loop;
+  // Read by the parsing thread, which stop() clears it for from another
+  std::atomic<bool> loop;
   boost::thread *parse_thr_;
   std::string   pcapPath;
   std::string   m_sFrameId;
   boost::function<void(const uint8_t*, const int, double timestamp)> callback; 
+  boost::function<void()> end_callback;
   std::map<std::string, std::pair<int,int>> m_timeIndexMap;
   int m_iTsIndex;
   int m_iUTCIndex;

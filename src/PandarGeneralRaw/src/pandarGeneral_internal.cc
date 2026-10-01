@@ -714,6 +714,7 @@ void PandarGeneral_Internal::Start() {
 
   enable_lidar_recv_thr_ = true;
   enable_lidar_process_thr_ = true;
+  pcap_read_to_end_ = false;
   lidar_process_thr_ = new boost::thread(
       boost::bind(&PandarGeneral_Internal::ProcessLiarPacket, this));
 
@@ -721,7 +722,8 @@ void PandarGeneral_Internal::Start() {
     lidar_recv_thr_ =
         new boost::thread(boost::bind(&PandarGeneral_Internal::RecvTask, this));
   } else {
-    pcap_reader_->start(boost::bind(&PandarGeneral_Internal::FillPacket, this, _1, _2, _3));
+    pcap_reader_->start(boost::bind(&PandarGeneral_Internal::FillPacket, this, _1, _2, _3),
+                        boost::bind(&PandarGeneral_Internal::OnPcapReadToEnd, this));
   }
 
   if(0 != m_u16LidarAlgorithmPort) {
@@ -814,6 +816,14 @@ void PandarGeneral_Internal::RecvTask() {
   }
 }
 
+void PandarGeneral_Internal::SetPcapEndCallback(boost::function<void()> callback) {
+  pcap_end_callback_ = callback;
+}
+
+void PandarGeneral_Internal::OnPcapReadToEnd() {
+  pcap_read_to_end_ = true;
+}
+
 void PandarGeneral_Internal::FillPacket(const uint8_t *buf, const int len, double timestamp) {
   if (len != GPS_PACKET_SIZE) {
     PandarPacket pkt;
@@ -831,12 +841,23 @@ void PandarGeneral_Internal::ProcessLiarPacket() {
   int ret = 0;
 
   boost::shared_ptr<PPointCloud> outMsg(new PPointCloud());
+  // Told once a Start(), which starts this thread anew
+  bool pcap_end_told = false;
 
   while (enable_lidar_process_thr_) {
     boost::this_thread::interruption_point();
+    // Read before the buffer is tried: once the reader has read all it will,
+    // the buffer found empty after it holds nothing more of the pcap
+    const bool read_to_end = pcap_read_to_end_;
     PandarPacket packet;
     if (!m_PacketsBuffer.pop(packet))
     {
+      if (read_to_end && !pcap_end_told) {
+        pcap_end_told = true;
+        if (pcap_end_callback_) {
+          pcap_end_callback_();
+        }
+      }
       usleep(1000);
       continue;
     }

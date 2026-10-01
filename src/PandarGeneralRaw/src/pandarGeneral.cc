@@ -88,6 +88,10 @@ void PandarGeneral::Start() { internal_->Start(); }
  */
 void PandarGeneral::Stop() { internal_->Stop(); }
 
+void PandarGeneral::SetPcapEndCallback(boost::function<void()> callback) {
+  internal_->SetPcapEndCallback(callback);
+}
+
 int PandarGeneral::getMajorVersion() {
   if (internal_) {
     // iurii@proviz.io: Must return value

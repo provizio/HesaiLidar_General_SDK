@@ -107,6 +107,12 @@ void PandarGeneralSDK::Start() {
       boost::bind(&PandarGeneralSDK::GetCalibrationFromDevice, this));
 }
 
+void PandarGeneralSDK::SetPcapEndCallback(boost::function<void()> callback) {
+  if (pandarGeneral_) {
+    pandarGeneral_->SetPcapEndCallback(callback);
+  }
+}
+
 void PandarGeneralSDK::Stop() {
   if (pandarGeneral_) pandarGeneral_->Stop();
 

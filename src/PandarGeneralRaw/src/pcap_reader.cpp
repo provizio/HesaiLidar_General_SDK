@@ -54,11 +54,13 @@ void PcapReader::initTimeIndexMap() {
   m_timeIndexMap.insert(std::pair<string,std::pair<int,int>>("PandarXTM", std::pair<int,int>(811,805)));
 }
 
-void PcapReader::start(boost::function<void(const uint8_t*, const int, double timestamp)> callback) {
+void PcapReader::start(boost::function<void(const uint8_t*, const int, double timestamp)> callback,
+                       boost::function<void()> end_callback) {
   // LOG_FUNC();
   stop();
 
   this->callback = callback;
+  this->end_callback = end_callback;
   loop           = true;
 
   parse_thr_ = new boost::thread(boost::bind(&PcapReader::parsePcap, this));
@@ -76,6 +78,19 @@ void PcapReader::stop() {
 }
 
 namespace {
+// Tells of the reading's end however it ends of itself, its file read to its
+// end or one that can't be read: not of one stop() ends, which clears the
+// loop flag before interrupting the thread
+struct reading_end_teller {
+  const std::atomic<bool> &loop;
+  const boost::function<void()> &end_callback;
+  ~reading_end_teller() {
+    if (loop && end_callback) {
+      end_callback();
+    }
+  }
+};
+
 // Closes the file however the reading ends: stop() ends it by interrupting
 // the thread, which unwinds past the end of parsePcap()
 struct pcap_file_closer {
@@ -94,6 +109,9 @@ struct pcap_file_closer {
 
 void PcapReader::parsePcap() {
   // LOG_FUNC();
+  // Declared first, so that every way out of the reading tells of its end,
+  // the file closed by then
+  const reading_end_teller end_teller = {loop, end_callback};
   pcap_t *pcapFile = NULL;
   char pcapBuf[PCAP_ERRBUF_SIZE];
   struct bpf_program filter;

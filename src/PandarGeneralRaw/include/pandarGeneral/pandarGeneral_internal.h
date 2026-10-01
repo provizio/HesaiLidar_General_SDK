@@ -86,6 +86,7 @@ static inline int sem_timedwait(sem_t *sem, const struct timespec *abs_timeout) 
 #include <semaphore.h>
 #endif
 
+#include <atomic>
 #include <list>
 #include <string>
 #include <mutex>
@@ -518,6 +519,13 @@ class PandarGeneral_Internal {
 
   void Start();
   void Stop();
+  /**
+   * @brief Sets what is called once a pcap has been read to its end, or turns
+   * out not to be readable, and what was read of it has all been processed,
+   * its point clouds given to the point cloud callback: once a Start(), on the
+   * thread that processes the packets. Not when Stop() ends the reading.
+   */
+  void SetPcapEndCallback(boost::function<void()> callback);
   bool GetCorrectionFileFlag();
   void SetCorrectionFileFlag(bool flag);
 
@@ -613,6 +621,11 @@ class PandarGeneral_Internal {
   boost::thread *lidar_process_thr_;
   bool enable_lidar_recv_thr_;
   bool enable_lidar_process_thr_;
+  boost::function<void()> pcap_end_callback_;
+  // Set by the pcap reader's thread once its reading has ended of itself, for
+  // the processing thread to tell of the pcap's end once it has processed all
+  std::atomic<bool> pcap_read_to_end_{false};
+  void OnPcapReadToEnd();
   int start_angle_;
   std::string m_sTimestampType;
   double m_dPktTimestamp;

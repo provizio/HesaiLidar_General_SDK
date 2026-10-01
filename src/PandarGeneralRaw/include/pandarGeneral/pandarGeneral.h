@@ -94,6 +94,13 @@ class PandarGeneral {
    */
   void Stop();
 
+  /**
+   * @brief Sets what is called once a pcap has been read to its end, or turns
+   * out not to be readable, and its point clouds have all been given to the
+   * point cloud callback: once a Start(), not when Stop() ends the reading.
+   */
+  void SetPcapEndCallback(boost::function<void()> callback);
+
   /** @brief get major version.
   * @Return   ： major version
    */
